@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Stock Profit Calculator</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Stock Profit Calculator</h1>
+        <form id="stockForm">
+            <label for="datetimeFrom">From Time:</label>
+            <input type="text" id="datetimeFrom" name="datetimeFrom" required>
+            <br>
+            <label for="datetimeTo">To Time:</label>
+            <input type="text" id="datetimeTo" name="datetimeTo" required>
+            <br>
+            <label for="availableFunds">Available funds:</label>
+            <input type="number" id="availableFunds" name="availableFunds" step="0.01" min="0" inputmode="numeric"
+                required>
+            <br><br><br>
+            <button type="button" id="calculateButton">Calculate</button>
+        </form>
+        <div class="result" id="result">
+            <!-- Result fields here (hidden by default) -->
+        </div>
+        <br>
+        <div>Please note data is defined for period<br> 02-10-2023 00:00 to 02-10-2023 12:00</div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const stockForm = document.getElementById('stockForm');
+
+            const datetimeFrom = flatpickr("#datetimeFrom", {
+                enableTime: true,
+                dateFormat: "d-m-Y H:i",
+            });;
+            const datetimeTo = flatpickr("#datetimeTo", {
+                enableTime: true,
+                dateFormat: "d-m-Y H:i",
+            });
+
+            const result = document.getElementById('result');
+
+            const availableFunds = document.getElementById('availableFunds');
+            const calculateButton = document.getElementById('calculateButton');
+
+            availableFunds.addEventListener('change', function () {
+                var v = parseFloat(this.value);
+                if (isNaN(v)) {
+                    this.value = 'Please enter valid number';
+                } else {
+                    this.value = v.toFixed(2);
+                }
+            });
+
+            calculateButton.addEventListener('click', async () => {
+                const fromTime = datetimeFrom.selectedDates[0];
+                const toTime = datetimeTo.selectedDates[0];
+
+
+                const fundsNumber = availableFunds.value;
+
+                if (fromTime == undefined || toTime == undefined) {
+                    alert('Please select From and To date and time.');
+                    return;
+                }
+
+                const fromTimestamp = Math.floor(fromTime.getTime() / 1000);
+                const toTimestamp = Math.floor(toTime.getTime() / 1000);
+
+
+                if (fromTime >= toTime) {
+                    alert('Please select a valid time range.');
+                    return;
+                }
+
+                if (availableFunds.value == "") {
+                    alert('Please enter funds.');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/stock/calculateMaxProfit?from=${fromTimestamp}&to=${toTimestamp}`, {
+                        method: 'GET',
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+
+                        result.innerHTML = `
+                        <h2>Result:</h2>
+                        <p><strong>Best Buy Time:</strong> ${new Date(data.maxGainBuyPoint.sec * 1000).toLocaleString()}</p>
+                        <p><strong>Best Buy Price:</strong> ${data.maxGainBuyPoint.price}</p>
+                        <p><strong>Best Sell Time:</strong> ${new Date(data.maxGainSellPoint.sec * 1000).toLocaleString()}</p>
+                        <p><strong>Best Sell Price:</strong> ${data.maxGainSellPoint.price}</p>
+                        <p><strong>Posible profit for the time period:</strong> ${((fundsNumber / data.maxGainBuyPoint.price) * data.maxGainSellPoint.price - fundsNumber).toFixed(2)}</p>
+                        <p>You could have bought ${(fundsNumber / data.maxGainBuyPoint.price).toFixed(2)} stock shares.</p>
+                    `;
+
+                        result.style.display = 'block'; // Show the result
+                    } else {
+                        const data = await response.json();
+
+                        if (data) {
+                            alert(data.error);
+                        } else {
+                            alert('An error occurred while fetching data.');
+                        }
+                    }
+                } catch (error) {
+                    console.error(error);
+                    alert('An error occurred while processing the request.');
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
